@@ -1,6 +1,7 @@
 import math
 
 import cv2
+import numpy as np
 
 
 class Camera:
@@ -12,10 +13,10 @@ class Camera:
         else:
             self.tag_size = 6
 
-        self.intrinsic_parameters = [[660.42091855, 0., 342.7709279], [0., 658.68629884, 231.84135911],
-                                     [0., 0., 1.]]
-        self.distortion_coefficients = [
-            [1.72827466e-01, -1.26394997e+00, -7.47066210e-03, 2.81406371e-03, 3.15535405e+00]]
+        self.intrinsic_parameters = np.asarray([[660.42091855, 0., 342.7709279], [0., 658.68629884, 231.84135911],
+                                                [0., 0., 1.]])
+        self.distortion_coefficients = np.asarray([
+            [1.72827466e-01, -1.26394997e+00, -7.47066210e-03, 2.81406371e-03, 3.15535405e+00]])
 
         self.camera_stream = cv2.VideoCapture(1)
         self.frame = None
