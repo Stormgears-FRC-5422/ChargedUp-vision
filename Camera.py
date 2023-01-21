@@ -1,7 +1,11 @@
 import math
+import pickle
+from os import path
 
 import cv2
 import numpy as np
+
+from Constants import *
 
 
 class Camera:
@@ -13,12 +17,10 @@ class Camera:
         else:
             self.tag_size = 6
 
-        self.intrinsic_parameters = np.asarray([[660.42091855, 0., 342.7709279], [0., 658.68629884, 231.84135911],
-                                                [0., 0., 1.]])
-        self.distortion_coefficients = np.asarray([
-            [1.72827466e-01, -1.26394997e+00, -7.47066210e-03, 2.81406371e-03, 3.15535405e+00]])
+        self.intrinsic_parameters, self.distortion_coefficients = self.get_calibrated_parameters()
 
-        self.camera_stream = cv2.VideoCapture(1)
+        self.camera_stream = cv2.VideoCapture(CAMERA_INDEX)
+        self.camera_stream.set(cv2.CAP_PROP_BRIGHTNESS, CAMERA_BRIGHTNESS)
         self.frame = None
 
         self.original_corners, self.corners = None, None
@@ -31,6 +33,28 @@ class Camera:
         self.parameters = cv2.aruco.DetectorParameters()
         self.parameters.cornerRefinementMethod = cv2.aruco.CORNER_REFINE_SUBPIX
         self.detector = cv2.aruco.ArucoDetector(self.dictionary, self.parameters)
+
+    @staticmethod
+    def get_calibrated_parameters():
+        """
+        This function is used to get the calibrated parameters of the camera
+        :return: intrinsic_parameters, distortion_coefficients
+        """
+        if path.exists(CALIBRATION_FILE):
+            print("Calibration file found")
+            objects = []
+            with (open(CALIBRATION_FILE, "rb")) as openfile:
+                while True:
+                    try:
+                        objects.append(pickle.load(openfile))
+                    except EOFError:
+                        break
+            return objects[0][0], objects[0][1]
+        else:
+            print("Calibration file not found, using old pre-defined values")
+            return np.asarray([[660.42091855, 0., 342.7709279], [0., 658.68629884, 231.84135911],
+                               [0., 0., 1.]]), np.asarray(
+                [[1.72827466e-01, -1.26394997e+00, -7.47066210e-03, 2.81406371e-03, 3.15535405e+00]])
 
     @staticmethod
     def calculate_distance_between_two_points(point1, point2):
@@ -64,3 +88,7 @@ class Camera:
                         self.centerX, self.centerY), [self.side1, self.side2, self.side3, self.side4]])
 
             return self.ids, markers, self.corners
+
+
+if __name__ == '__main__':
+    camera = Camera()
