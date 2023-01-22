@@ -215,6 +215,9 @@ def startSwitchedCamera(config):
 
     return server
 
+# This is an example.  instead we should instance an instance of our CV processing code
+# with handles to ntinst, camera and stream out and execute the a processing method in 
+# the loop below
 def cv_thread(ntinst,camera,stream_out):
     print("Processing cv_thread")
     while True:
