@@ -4,7 +4,7 @@ import tarfile
 import glob
 
 temp_folder = 'c:\\temp\\frcvision'
-temp_lib_folder = temp_folder + '\\python\\lib'
+temp_lib_folder = temp_folder + '\\lib\\python'
 temp_etc_folder = temp_folder + '\\etc'
 tar_file_name = temp_folder + '.tar.gz'
 
@@ -26,7 +26,7 @@ for file in glob.glob('pi/scripts/*'):
 #os.makedirs(temp_lib_folder)
 
 print ('Copying all lib files')
-shutil.copytree('pi/python/lib', temp_lib_folder)
+shutil.copytree('pi/lib/python', temp_lib_folder)
 
 print ('Copying etc files')
 shutil.copytree('pi/etc', temp_etc_folder)
