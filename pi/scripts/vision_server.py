@@ -13,12 +13,12 @@ import numpy as np
 from cscore import CameraServer, VideoSource, UsbCamera, MjpegServer
 from ntcore import NetworkTableInstance, EventFlags
 
-from MarkerDetection import MarkerDetection
-
 # Make sure our python libraries are in the path
 sys.path.insert(0,"/home/pi/lib/python")
 import storm_core
 import storm_vision
+from MarkerDetection import MarkerDetection
+
 
 #   JSON format:
 #   {
@@ -237,8 +237,8 @@ def cv_thread(ntinst, camera, stream_out):
             id_array.append([ID, id_dict[ID][0], id_dict[ID][1], id_dict[ID][2], id_dict[ID][3]])
             print("ID: {}, Distance: {}, Roll: {}, Yaw: {}, Pitch: {}".format(ID, id_dict[ID][0], id_dict[ID][1],
                                                                               id_dict[ID][2], id_dict[ID][3]))
-        ntu = storm_core.nt_util(nt_inst=ntinst, base_table="vision_data")
-        ntu.publish_data_structure(type="id_info", structure_definition=id_dict)
+        #ntu = storm_core.nt_util(nt_inst=ntinst, base_table="vision_data")
+        #ntu.publish_data_structure(type="id_info", structure_definition=id_dict)
         output_frame = np.copy(frame)
         stream_out.putFrame(output_frame)
 
@@ -280,7 +280,7 @@ if __name__ == "__main__":
     # loop forever
     while True:
         # reconnect network tables
-        if not ntinst.isConnected():
+        if False and not ntinst.isConnected():
             print("Network tables disconnected, tring to reconnect")
             ntinst.stopClient()
             ntinst.startClient4("wpilibpi")

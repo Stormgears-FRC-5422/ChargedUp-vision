@@ -3,7 +3,7 @@
     "cameras": [
         {
             "brightness": 80,
-            "exposure": 38,
+            "exposure": 44,
             "fps": 30,
             "width": 640,
             "height": 480,
@@ -51,8 +51,7 @@
             "stream": {
                 "properties": []
             },
-            "white balance": 5026,
-            "width": 320
+            "white balance": 3578
         }
     ],
     "ntmode": "client",
