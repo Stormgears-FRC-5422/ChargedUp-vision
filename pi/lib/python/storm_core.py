@@ -22,21 +22,25 @@ class nt_util:
         if (type in self._structs):
             return self._structs[type]
         else:
-            struct_table = self.nt_inst.getTable(self.base_table + "/structs/" + type)
-            if (struct_table.containsKey("name") and struct_table.containsKey("size")):
-                # populate _structs with definition from network tables
+            table = self.nt_inst.getTable(self.base_table)
+            name_sub = table.getStringArrayTopic("structs/" + type + "/names").subscribe([])
+            size_sub = table.getIntegerArrayTopic("structs/" + type + "/sizes").subscribe([])
+            type_sub = table.getIntegerTopic("structs/" + type + "/type").subscribe(-1)
+
+            keys = name_sub.get()
+            sizes = size_sub.get()
+            typeid = type_sub.get(-1)
+            if len(keys):
                 struct_map = {}
-                keys = struct_table.getStringArray("name",[]);
-                values = struct_table.getNumberArray("size",[]);
-                typeid = int(struct_table.getNumber("type",-1));
                 struct_map["typeid"] = typeid
                 struct_map["fields"] = collections.OrderedDict()
                 for i in (range(len(keys))):
-                    struct_map["fields"][keys[i]] = values[i]
+                    struct_map["fields"][keys[i]] = sizes[i]
                 self._structs[type] = struct_map
                 return struct_map
             else:
                 return None
+
 
     def publish_data_structure(self,type,structure_definition):
         # Push a description of a data structure identified by type
@@ -58,15 +62,14 @@ class nt_util:
             struct_map = { "typeid": current_index, "fields": structure_definition}
             nt_util.current_index += 1
             
-        table = self.nt_inst.getTable(self.base_table + "/structs/" + type)
+        table = self.nt_inst.getTable(self.base_table)
+        name_pub = table.getStringArrayTopic("structs/" + type + "/names").publish()
+        value_pub = table.getIntegerArrayTopic("structs/" + type + "/sizes").publish()
+        type_pub = table.getIntegerTopic("structs/" + type + "/type").publish()
 
-        type_entry = table.getEntry("type")
-        type_entry.setNumber(current_index)
-
-        entry = table.getEntry("name")
-        val_entry = table.getEntry("size")
-        entry.setStringArray(structure_definition.keys())
-        val_entry.setNumberArray(structure_definition.values())
+        name_pub.set(list(structure_definition.keys()))
+        value_pub.set(list(structure_definition.values()))
+        type_pub.set(current_index)
 
         self._structs[type] = struct_map  # keep track of structures we know
         
@@ -106,10 +109,11 @@ class nt_util:
         return data_list
 
     def pull_binary_data(self,name,type):
-        table_name = self.base_table + "/binary_data/" + type
-        table = self.nt_inst.getTable(table_name)
-        entry = table.getEntry(name)
-        raw_data = entry.getRaw(bytearray())
+        table = self.nt_inst.getTable(sel.base_table)
+        data_pub = table.getRawTopic(f'binary_data/{type}')
+        raw_data = data_pub.get(bytearray())
+
+
         return raw_data
 
     def pull_data(self,name,type):
@@ -126,13 +130,13 @@ class nt_util:
 
     def publish_binary_data(self,name,type,raw_data):
         # Table: BASE/binary/datatype
-        table = self.nt_inst.getTable(self.base_table + "/binary_data/" + type)
+        table = self.nt_inst.getTable(self.base_table)
+        data_pub = table.getRawTopic(f"binary_data/{type}")
 
         if raw_data != None:
-            entry = table.getEntry(name)
-            entry.setRaw(raw_data)
+            data_pub.set(raw_data)
         else:
-            print("Id %s not a known data structure" %type)
+            print(f"Id {type} not a known data structure")
 
     def convert_to_binary(self,type,data_list):
         # serialize hash into binary data

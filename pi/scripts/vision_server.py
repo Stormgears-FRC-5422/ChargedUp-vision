@@ -7,7 +7,7 @@
 import json
 import time
 import sys
-
+import collections
 import numpy as np
 
 from cscore import CameraServer, VideoSource, UsbCamera, MjpegServer
@@ -18,6 +18,7 @@ sys.path.insert(0,"/home/pi/lib/python")
 import storm_core
 import storm_vision
 from MarkerDetection import MarkerDetection
+
 
 
 #   JSON format:
@@ -226,6 +227,16 @@ def cv_thread(ntinst, camera, stream_out):
     print("Processing cv_thread")
     frame = np.zeros(shape=(640, 420, 3), dtype=np.uint8)
     detector = MarkerDetection()
+    tag_data_struct = collections.OrderedDict()
+    tag_data_struct['id'] = 1
+    tag_data_struct['distance'] = -2
+    tag_data_struct['roll'] = -2
+    tag_data_struct['yaw'] = -2
+    tag_data_struct['pitch'] = -2
+    tag_data_struct['float_scale'] = 1
+
+    ntu = storm_core.nt_util(nt_inst=ntinst,base_table="vision-data")
+    ntu.publish_data_structure(type="tag_data",structure_definition=tag_data_struct)
 
     while True:
         _, frame = camera.grabFrame(frame)
@@ -238,7 +249,6 @@ def cv_thread(ntinst, camera, stream_out):
             print("ID: {}, Distance: {}, Roll: {}, Yaw: {}, Pitch: {}".format(ID, id_dict[ID][0], id_dict[ID][1],
                                                                               id_dict[ID][2], id_dict[ID][3]))
         #ntu = storm_core.nt_util(nt_inst=ntinst, base_table="vision_data")
-        #ntu.publish_data_structure(type="id_info", structure_definition=id_dict)
         output_frame = np.copy(frame)
         stream_out.putFrame(output_frame)
 
