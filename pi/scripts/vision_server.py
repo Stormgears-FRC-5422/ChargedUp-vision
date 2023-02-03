@@ -235,6 +235,8 @@ def cv_thread(ntinst, camera, stream_out):
     tag_data_struct['pitch'] = -2
     tag_data_struct['float_scale'] = 1
 
+    tag_data = {}
+
     ntu = storm_core.nt_util(nt_inst=ntinst,base_table="vision-data")
     ntu.publish_data_structure(type="tag_data",structure_definition=tag_data_struct)
 
@@ -248,6 +250,14 @@ def cv_thread(ntinst, camera, stream_out):
             id_array.append([ID, id_dict[ID][0], id_dict[ID][1], id_dict[ID][2], id_dict[ID][3]])
             print("ID: {}, Distance: {}, Roll: {}, Yaw: {}, Pitch: {}".format(ID, id_dict[ID][0], id_dict[ID][1],
                                                                               id_dict[ID][2], id_dict[ID][3]))
+            tag_data['id'] = ID
+            tag_data['distance'] = id_dict[ID][0]
+            tag_data['roll'] = id_dict[ID][1]
+            tag_data['yaw'] = id_dict[ID][2]
+            tag_data['pitch'] = id_dict[ID][3]
+            tag_data['float_scale'] = 10
+
+        ntu.publish_data("april_tag","tag_data",[tag_data])
         #ntu = storm_core.nt_util(nt_inst=ntinst, base_table="vision_data")
         output_frame = np.copy(frame)
         stream_out.putFrame(output_frame)
@@ -269,7 +279,9 @@ if __name__ == "__main__":
     else:
         print("Setting up NetworkTables client for team {}".format(team))
         ntinst.startClient4("wpilibpi")
-        ntinst.setServerTeam(team)
+        print("DEBUG overriding networktables server")
+        ntinst.setServer("192.168.200.106", NetworkTableInstance.kDefaultPort4)
+#        ntinst.setServerTeam(team)
         ntinst.startDSClient()
 
     # start cameras

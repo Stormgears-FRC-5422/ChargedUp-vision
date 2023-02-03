@@ -13,6 +13,7 @@ class nt_util:
         self.nt_inst = nt_inst
         self.base_table = base_table
         self._structs = {}
+        self.publishers = {'struct':{},'data':{}}   # indexed by struct type, then definition and data
 
         
     def get_base_table(self):
@@ -62,14 +63,34 @@ class nt_util:
             struct_map = { "typeid": current_index, "fields": structure_definition}
             nt_util.current_index += 1
             
-        table = self.nt_inst.getTable(self.base_table)
-        name_pub = table.getStringArrayTopic("structs/" + type + "/names").publish()
-        value_pub = table.getIntegerArrayTopic("structs/" + type + "/sizes").publish()
-        type_pub = table.getIntegerTopic("structs/" + type + "/type").publish()
 
+        table = self.nt_inst.getTable(self.base_table)
+
+        publishers = {}
+
+        name_topic = table.getStringArrayTopic("structs/" + type + "/names")
+#        name_topic.setRetained(True)
+        name_pub = name_topic.publish()        
+        publishers['name'] = name_pub
+        size_topic = table.getIntegerArrayTopic("structs/" + type + "/sizes")
+#        size_topic.setRetained(True)
+        value_pub = size_topic.publish()
+        publishers['value'] = value_pub
+        type_topic = table.getIntegerTopic("structs/" + type + "/type")
+#        type_topic.setRetained(True)
+        type_pub = type_topic.publish()
+        publishers['type'] = type_pub
+
+        print("Publishing data structure")
         name_pub.set(list(structure_definition.keys()))
         value_pub.set(list(structure_definition.values()))
         type_pub.set(current_index)
+
+        if type not in self.publishers:
+            self.publishers[type] = {}
+        self.publishers[type]['struct'] = publishers
+        # initialize dict for data
+        self.publishers[type]['data'] = {}
 
         self._structs[type] = struct_map  # keep track of structures we know
         
@@ -110,9 +131,9 @@ class nt_util:
 
     def pull_binary_data(self,name,type):
         table = self.nt_inst.getTable(sel.base_table)
-        data_pub = table.getRawTopic(f'binary_data/{type}')
-        raw_data = data_pub.get(bytearray())
-
+        data_sub = table.getRawTopic(f'binary_data/{type}').subscribe()
+        raw_data = data_sub.get(bytearray())
+        # Fixme, save subscribe in object?
 
         return raw_data
 
@@ -129,9 +150,14 @@ class nt_util:
         self.publish_binary_data(name,type,raw_data)
 
     def publish_binary_data(self,name,type,raw_data):
-        # Table: BASE/binary/datatype
-        table = self.nt_inst.getTable(self.base_table)
-        data_pub = table.getRawTopic(f"binary_data/{type}")
+        if name not in self.publishers[type]['data']:
+
+            # Table: BASE/binary/datatype
+            table = self.nt_inst.getTable(self.base_table)
+            data_pub = table.getRawTopic(f"binary_data/{type}/{name}").publish(type)
+            self.publishers[type]['data'][name] = data_pub
+        else:
+            data_pub = self.publishers[type]['data'][name]
 
         if raw_data != None:
             data_pub.set(raw_data)
@@ -141,6 +167,7 @@ class nt_util:
     def convert_to_binary(self,type,data_list):
         # serialize hash into binary data
         # Returns the raw data stream 
+        # data_list is list of dicts, each representing a data structure and getting serialized
         struct_map = self.get_data_struct_map(type)
         raw_data = None
 
