@@ -227,17 +227,19 @@ def cv_thread(ntinst, camera, stream_out):
     print("Processing cv_thread")
     frame = np.zeros(shape=(640, 420, 3), dtype=np.uint8)
     detector = MarkerDetection()
-    tag_data_struct = collections.OrderedDict()
-    tag_data_struct['id'] = 1
-    tag_data_struct['distance'] = -2
-    tag_data_struct['roll'] = -2
-    tag_data_struct['yaw'] = -2
-    tag_data_struct['pitch'] = -2
-    tag_data_struct['float_scale'] = 1
 
     tag_data = {}
 
     ntu = storm_core.nt_util(nt_inst=ntinst,base_table="vision-data")
+
+    tag_data_struct = collections.OrderedDict()
+    tag_data_struct['id'] = ntu.encode_encoding_field(num_bytes=1,precision=0)
+    tag_data_struct['distance'] = ntu.encode_encoding_field(num_bytes=2,precision=2,signed=True)
+    tag_data_struct['roll'] = ntu.encode_encoding_field(num_bytes=2,precision=2,signed=True)
+    tag_data_struct['yaw'] = ntu.encode_encoding_field(num_bytes=2,precision=2,signed=True)
+    tag_data_struct['pitch'] = ntu.encode_encoding_field(num_bytes=2,precision=2,signed=True)
+
+
     ntu.publish_data_structure(type="tag_data",structure_definition=tag_data_struct)
 
     while True:
@@ -255,7 +257,6 @@ def cv_thread(ntinst, camera, stream_out):
             tag_data['roll'] = id_dict[ID][1]
             tag_data['yaw'] = id_dict[ID][2]
             tag_data['pitch'] = id_dict[ID][3]
-            tag_data['float_scale'] = 10
 
         ntu.publish_data("april_tag","tag_data",[tag_data])
         #ntu = storm_core.nt_util(nt_inst=ntinst, base_table="vision_data")

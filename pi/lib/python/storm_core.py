@@ -5,6 +5,7 @@ import numpy as np
 from ntcore import NetworkTableInstance
 import collections
 
+
 class nt_util:
     BASE_TABLE = "stormdata"
     current_index = 0
@@ -25,18 +26,18 @@ class nt_util:
         else:
             table = self.nt_inst.getTable(self.base_table)
             name_sub = table.getStringArrayTopic("structs/" + type + "/names").subscribe([])
-            size_sub = table.getIntegerArrayTopic("structs/" + type + "/sizes").subscribe([])
+            encoding_sub = table.getIntegerArrayTopic("structs/" + type + "/encodings").subscribe([])
             type_sub = table.getIntegerTopic("structs/" + type + "/type").subscribe(-1)
 
             keys = name_sub.get()
-            sizes = size_sub.get()
+            encodings = encoding_sub.get()
             typeid = type_sub.get(-1)
             if len(keys):
                 struct_map = {}
                 struct_map["typeid"] = typeid
                 struct_map["fields"] = collections.OrderedDict()
                 for i in (range(len(keys))):
-                    struct_map["fields"][keys[i]] = sizes[i]
+                    struct_map["fields"][keys[i]] = encodings[i]
                 self._structs[type] = struct_map
                 return struct_map
             else:
@@ -44,8 +45,17 @@ class nt_util:
 
 
     def publish_data_structure(self,type,structure_definition):
+        """Publishes the specification of a complex data structure to network tables so that a reader on the other side can decode data
+        type: string naming the data structure
+        structure_definition: OrderedDict describing how the data structure is serialzed into a binary stream
+            Keys are the name of each field to be sent
+            Values are a 1 byte encoding defined in encode_coding_value()
+
+        This method will associate a unique typeid integer with the data type and that will be transmitted in the binary packet              
+
+        """
         # Push a description of a data structure identified by type
-        # to network tables.  everything is unsigned ints UNLESS the size is specified as negative, in which case it is signed
+        # to network tables.  everything is unsigned ints UNLESS the encoding size is specified as negative, in which case it is signed
         # Table BASE/structs/type
         # 2 entries: names, values (stringArray,NumArray)
         # name -> # bytes.
@@ -72,11 +82,11 @@ class nt_util:
 #        name_topic.setRetained(True)
         name_pub = name_topic.publish()        
         publishers['name'] = name_pub
-        size_topic = table.getIntegerArrayTopic("structs/" + type + "/sizes")
-#        size_topic.setRetained(True)
-        value_pub = size_topic.publish()
+        encoding_topic = table.getIntegerArrayTopic("structs/" + type + "/encodings")  # type (7:2) (1pppp p=precision, 0xxx0 = unsigned int, 0xxx1 = signed int) and # of bytes (2:0 111=8 bytes,00=1 byte)
+#        encoding_topic.setRetained(True)
+        value_pub = encoding_topic.publish()
         publishers['value'] = value_pub
-        type_topic = table.getIntegerTopic("structs/" + type + "/type")
+        type_topic = table.getIntegerTopic("structs/" + type + "/type")  # The typeid
 #        type_topic.setRetained(True)
         type_pub = type_topic.publish()
         publishers['type'] = type_pub
@@ -96,6 +106,69 @@ class nt_util:
         
         return True
 
+    def encode_encoding_field(self,num_bytes,precision,signed=False):  
+        """Generates the binary byte encoding representing how a number is encoded. If precision present then encoding is float, otherwise signed int for negative num_bytes and unsigned for positive
+        [7] = sign bit
+        [6:3] = precision - how many digits after the decimal point are represented
+        [2:0] = number of bytes - how many bytes use to represent the unsigned value
+        """
+        byte = (abs(num_bytes)-1) & 0x3  # max 4 bytes
+        if precision:  # floating number precision
+            byte = byte | ((precision & 0x1f) << 3)
+        if num_bytes < 0 or signed:
+            byte = byte | 0x80
+
+        return(byte)
+
+    def decode_encoding_field(self,value):
+        """Given a byte (int) representing number encoding, decode into number of bytes, precision, and sign
+        [7] = sign bit
+        [6:3] = precision - how many digits after the decimal point are represented
+        [2:0] = number of bytes - how many bytes use to represent the unsigned value
+        """
+        if isinstance(value,bytes):
+            value = int.from_bytes(value,byteorder='big',signed=False)
+
+        value = abs(value)
+        num_bytes = (value & 0x3) + 1
+
+        precision = (value & 0x7f) >> 3
+        if value & 0x80:
+            signed = True
+        else:
+            signed = False
+        return(num_bytes,precision,signed)            
+
+    def value_from_bytes(self,bytes_value,encoding):
+        """Given the one byte encoding field and a bytes object, return the int or float value"""
+        (num_bytes,precision,is_signed) = self.decode_encoding_field(encoding)
+        raw_value = int.from_bytes(bytes_value,
+                                    byteorder='big',
+                                    signed=is_signed)
+    
+        if precision > 0:  # floating point number
+            value = raw_value/(precision*10)
+        else:
+            value = raw_value
+        
+        return value 
+
+    def value_to_bytes(self,value,encoding):
+        """Given a int/float value and the one byte encoding field, return a bytes object representing the value"""
+        (num_bytes,precision,is_signed) = self.decode_encoding_field(encoding)
+        if precision > 0:
+            value = value * (10 * precision)
+
+        min_value = 0
+        max_value = 1 << (num_bytes * 8) - 1
+        if is_signed:
+            max_value = max_value/2
+            min_value = max_value * -1
+        if value > max_value: value = max_value
+        if value < min_value: value = min_value
+
+        return value.to_bytes(num_bytes, byteorder='big', signed=is_signed)
+
     def convert_from_binary(self,type,raw_data):
         data_list = []
         struct_map = self.get_data_struct_map(type) 
@@ -111,16 +184,8 @@ class nt_util:
                 data = {}
                 for key in struct_map["fields"].keys():
                     # Determine if signed or unsiged ... negative value in structs means signed
-                    data_size = struct_map["fields"][key]
-                    if data_size < 0:
-                        is_signed = True
-                        data_size *= -1
-                    else:
-                        is_signed = False
-
-                    data[key] = int.from_bytes(bytes(raw_data[offset:offset+data_size]),
-                                                          byteorder='big',
-                                                          signed=is_signed)
+                    data_encoding= struct_map["fields"][key]
+                    data[key] = self.value_from_bytes(raw_data[offset:offset+num_bytes],data_encoding)
                     offset += data_size
 
                 data_list.append(data)
@@ -145,11 +210,13 @@ class nt_util:
         return data_list
 
     def publish_data(self,name,type,data_list):
+        """Given a name for this data, the data type, and a list of data structures, serialize the data and publish it to network tables"""
         # Table: BASE/binary/datatype
         raw_data = self.convert_to_binary(type,data_list)
         self.publish_binary_data(name,type,raw_data)
 
     def publish_binary_data(self,name,type,raw_data):
+        """Given raw binary data, a name for this data, and the type of data, publish it to network tables"""
         if name not in self.publishers[type]['data']:
 
             # Table: BASE/binary/datatype
@@ -165,7 +232,7 @@ class nt_util:
             print(f"Id {type} not a known data structure")
 
     def convert_to_binary(self,type,data_list):
-        # serialize hash into binary data
+        """Serialize a list of data structures (field:value dicts) into binary data of a specific type"""
         # Returns the raw data stream 
         # data_list is list of dicts, each representing a data structure and getting serialized
         struct_map = self.get_data_struct_map(type)
@@ -183,28 +250,14 @@ class nt_util:
             for data_hash in data_list:
                 for key in struct_map["fields"].keys():
                     # Determine if signed or unsiged ... negative value in structs means signed
-                    data_size = struct_map["fields"][key]
-                    if data_size < 0:
-                        signed = True
-                        data_size *= -1
-                    else:
-                        signed = False
-
-                    min_value = 0
-                    max_value = 1 << (data_size * 8) - 1
-                    if signed:
-                        max_value = max_value/2
-                        min_value = max_value * -1
+                    data_encoding = struct_map["fields"][key]
+                    (num_bytes,precision,signed) = self.decode_encoding_field(data_encoding)
 
                     if (key in data_hash and isinstance(data_hash[key],int)):
                         data = data_hash[key]
-                        # prevent overflow conditions that crash the program by limiting the value
-                        if data > max_value:
-                            data = max_value
-                        if data < min_value:
-                            data = min_value
                     else:
                         data = 0
+                    data_bytes = self.value_to_bytes(data,data_encoding)
 
-                    raw_data += (data.to_bytes(data_size, byteorder='big', signed=signed))
+                    raw_data += data_bytes
         return raw_data
