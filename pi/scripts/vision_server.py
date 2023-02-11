@@ -10,6 +10,7 @@ import sys
 import collections
 import numpy as np
 
+
 from cscore import CameraServer, VideoSource, UsbCamera, MjpegServer
 from ntcore import NetworkTableInstance, EventFlags
 
@@ -281,8 +282,8 @@ if __name__ == "__main__":
         print("Setting up NetworkTables client for team {}".format(team))
         ntinst.startClient4("wpilibpi")
         print("DEBUG overriding networktables server")
-        ntinst.setServer("192.168.200.106", NetworkTableInstance.kDefaultPort4)
-#        ntinst.setServerTeam(team)
+#        ntinst.setServer("192.168.200.106", NetworkTableInstance.kDefaultPort4)
+        ntinst.setServerTeam(team)
         ntinst.startDSClient()
 
     # start cameras
