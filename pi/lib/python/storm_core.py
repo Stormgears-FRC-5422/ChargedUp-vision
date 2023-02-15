@@ -114,7 +114,7 @@ class nt_util:
         """
         byte = (abs(num_bytes)-1) & 0x3  # max 4 bytes
         if precision:  # floating number precision
-            byte = byte | ((precision & 0x1f) << 3)
+            byte = byte | ((precision & 0x1f) << 2)
         if num_bytes < 0 or signed:
             byte = byte | 0x80
 
@@ -132,7 +132,7 @@ class nt_util:
         value = abs(value)
         num_bytes = (value & 0x3) + 1
 
-        precision = (value & 0x7f) >> 3
+        precision = (value & 0x7f) >> 2
         if value & 0x80:
             signed = True
         else:
@@ -251,7 +251,6 @@ class nt_util:
                 for key in struct_map["fields"].keys():
                     # Determine if signed or unsiged ... negative value in structs means signed
                     data_encoding = struct_map["fields"][key]
-                    (num_bytes,precision,signed) = self.decode_encoding_field(data_encoding)
 
                     if (key in data_hash and isinstance(data_hash[key],int)):
                         data = data_hash[key]
