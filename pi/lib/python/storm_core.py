@@ -159,6 +159,9 @@ class nt_util:
         if precision > 0:
             value = value * (10 * precision)
 
+        if not isinstance(value,int):
+            value = int(value)
+
         min_value = 0
         max_value = 1 << (num_bytes * 8) - 1
         if is_signed:
@@ -227,6 +230,7 @@ class nt_util:
             data_pub = self.publishers[type]['data'][name]
 
         if raw_data != None:
+#            print(f"DEBUG: {raw_data}")
             data_pub.set(raw_data)
         else:
             print(f"Id {type} not a known data structure")
@@ -252,9 +256,10 @@ class nt_util:
                     # Determine if signed or unsiged ... negative value in structs means signed
                     data_encoding = struct_map["fields"][key]
                     (num_bytes,precision,signed) = self.decode_encoding_field(data_encoding)
-
-                    if (key in data_hash and isinstance(data_hash[key],int)):
-                        data = data_hash[key]
+#                    print(f'DEBUG: converting {key} {data_hash[key]} to binary {num_bytes}.{precision}')
+                    value = data_hash[key]
+                    if key in data_hash and (isinstance(value,int) or isinstance(value,float)):
+                        data = value
                     else:
                         data = 0
                     data_bytes = self.value_to_bytes(data,data_encoding)

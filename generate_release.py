@@ -32,8 +32,11 @@ shutil.copytree('pi/lib/python', temp_lib_folder)
 print ('Copying etc files')
 shutil.copytree('pi/etc', temp_etc_folder)
 
-print ('Copying pip files')
-shutil.copytree('pi/.local', temp_pip_folder)
+if os.path.isdir("pi/.local"):
+    print ('Copying pip files')
+    shutil.copytree('pi/.local', temp_pip_folder)
+else:
+    print("WARNING: pi local libraries not found, skipping")
 
 def set_permissions(tarinfo):
     tarinfo.mode = 0o777
@@ -44,8 +47,11 @@ def make_tarfile(output_filename, source_dir):
         for elem in glob.glob('*'):
             print('adding ', elem)
             tar.add(elem, filter=set_permissions)
-        print('adding .local')
-        tar.add('.local', filter=set_permissions)
+        if os.path.isdir(".local"):
+            print('adding .local')
+            tar.add('.local', filter=set_permissions)
+        else:
+            print("Skipping .local")
 
 print ('Tarball', temp_folder)
 os.chdir(temp_folder)
