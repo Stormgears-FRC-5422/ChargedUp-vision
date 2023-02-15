@@ -147,7 +147,7 @@ class nt_util:
                                     signed=is_signed)
     
         if precision > 0:  # floating point number
-            value = raw_value/(precision*10)
+            value = raw_value/(precision ** 10)
         else:
             value = raw_value
         
@@ -156,17 +156,25 @@ class nt_util:
     def value_to_bytes(self,value,encoding):
         """Given a int/float value and the one byte encoding field, return a bytes object representing the value"""
         (num_bytes,precision,is_signed) = self.decode_encoding_field(encoding)
+#        print(f'DEBUG: original value = {value}')
         if precision > 0:
-            value = value * (10 * precision)
+            value = value * (10 ** precision)
+#        print(f'DEBUG: mod {precision} value = {value}')
+
+        if not isinstance(value,int):
+            value = int(value)
+
+ #       print(f'DEBUG: int value = {value}')
 
         min_value = 0
         max_value = 1 << (num_bytes * 8) - 1
         if is_signed:
-            max_value = max_value/2
+            max_value = int(max_value/2)
             min_value = max_value * -1
         if value > max_value: value = max_value
         if value < min_value: value = min_value
 
+#        print(f'DEBUG: capped value = {value}')
         return value.to_bytes(num_bytes, byteorder='big', signed=is_signed)
 
     def convert_from_binary(self,type,raw_data):
@@ -227,6 +235,7 @@ class nt_util:
             data_pub = self.publishers[type]['data'][name]
 
         if raw_data != None:
+#            print(f"DEBUG: {raw_data}")
             data_pub.set(raw_data)
         else:
             print(f"Id {type} not a known data structure")
@@ -251,12 +260,12 @@ class nt_util:
                 for key in struct_map["fields"].keys():
                     # Determine if signed or unsiged ... negative value in structs means signed
                     data_encoding = struct_map["fields"][key]
-
-                    if (key in data_hash and isinstance(data_hash[key],int)):
-                        data = data_hash[key]
+                    value = data_hash[key]
+                    if key in data_hash and (isinstance(value,int) or isinstance(value,float)):
+                        data = value
                     else:
                         data = 0
                     data_bytes = self.value_to_bytes(data,data_encoding)
-
+#                    print(f'DEBUG: {key} {data_encoding} {data} {data_bytes}')
                     raw_data += data_bytes
         return raw_data

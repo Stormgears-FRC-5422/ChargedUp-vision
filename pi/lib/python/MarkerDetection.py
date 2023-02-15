@@ -75,7 +75,7 @@ class MarkerDetection:
                 self.rotational_vectors, self.translation_vectors, _ = cv2.aruco.estimatePoseSingleMarkers(
                     self.original_corners[marker], self.tag_size, self.intrinsic_parameters,
                     self.distortion_coefficients)
-                self.distance = np.round(np.linalg.norm(self.translation_vectors) * 12 * 3.3, 3)
+                self.distance = np.round(np.linalg.norm(self.translation_vectors), 3)
 
                 rotation_matrix = np.eye(4)
                 rotation_matrix[0:3, 0:3] = cv2.Rodrigues(np.array(self.rotational_vectors[0]))[0]

@@ -236,9 +236,9 @@ def cv_thread(ntinst, camera, stream_out):
     tag_data_struct = collections.OrderedDict()
     tag_data_struct['id'] = ntu.encode_encoding_field(num_bytes=1,precision=0)
     tag_data_struct['distance'] = ntu.encode_encoding_field(num_bytes=2,precision=2,signed=True)
-    tag_data_struct['roll'] = ntu.encode_encoding_field(num_bytes=2,precision=2,signed=True)
-    tag_data_struct['yaw'] = ntu.encode_encoding_field(num_bytes=2,precision=2,signed=True)
-    tag_data_struct['pitch'] = ntu.encode_encoding_field(num_bytes=2,precision=2,signed=True)
+    tag_data_struct['roll'] = ntu.encode_encoding_field(num_bytes=2,precision=1,signed=True)
+    tag_data_struct['yaw'] = ntu.encode_encoding_field(num_bytes=2,precision=1,signed=True)
+    tag_data_struct['pitch'] = ntu.encode_encoding_field(num_bytes=2,precision=1,signed=True)
 
 
     ntu.publish_data_structure(type="tag_data",structure_definition=tag_data_struct)
@@ -247,19 +247,19 @@ def cv_thread(ntinst, camera, stream_out):
         _, frame = camera.grabFrame(frame)
 
         id_dict = detector.get_information(frame)
-
-        id_array = []
+        tag_list = []
         for ID in id_dict.keys():
-            id_array.append([ID, id_dict[ID][0], id_dict[ID][1], id_dict[ID][2], id_dict[ID][3]])
             print("ID: {}, Distance: {}, Roll: {}, Yaw: {}, Pitch: {}".format(ID, id_dict[ID][0], id_dict[ID][1],
                                                                               id_dict[ID][2], id_dict[ID][3]))
-            tag_data['id'] = ID
+            tag_data['id'] = int(ID)
             tag_data['distance'] = id_dict[ID][0]
             tag_data['roll'] = id_dict[ID][1]
             tag_data['yaw'] = id_dict[ID][2]
             tag_data['pitch'] = id_dict[ID][3]
 
-        ntu.publish_data("april_tag","tag_data",[tag_data])
+            tag_list.append(tag_data)
+
+        ntu.publish_data("april_tag","tag_data",tag_list)
         #ntu = storm_core.nt_util(nt_inst=ntinst, base_table="vision_data")
         output_frame = np.copy(frame)
         stream_out.putFrame(output_frame)
