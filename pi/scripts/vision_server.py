@@ -9,6 +9,7 @@ import time
 import sys
 import collections
 import numpy as np
+import os
 
 
 from cscore import CameraServer, VideoSource, UsbCamera, MjpegServer
@@ -221,6 +222,25 @@ def startSwitchedCamera(config):
 
     return server
 
+def nt_connect():
+    ntinst = NetworkTableInstance.getDefault()
+
+    while not ntinst.isConnected():
+        ntinst.stopClient()
+        if os.system("ifconfig eth0 | grep 192.168.200") == 0:
+            print("Connecting to non-robot server")
+            ntinst.setServer("192.168.200.106", NetworkTableInstance.kDefaultPort4)
+        else:
+            print("Setting up NetworkTables client for team {}".format(team))
+            ntinst.setServerTeam(team)
+        ntinst.startClient4("wpilibpi")
+        ntinst.startDSClient()
+        print(f"startDSClient: connected = {ntinst.isConnected()}")
+        time.sleep(1)
+    connections = ntinst.getConnections()
+    print(f"Connected to Network Tables {connections[0]}")
+
+
 # This is an example.  instead we should instance an instance of our CV processing code
 # with handles to ntinst, camera and stream out and execute the a processing method in 
 # the loop below
@@ -279,12 +299,7 @@ if __name__ == "__main__":
         print("Setting up NetworkTables server")
         ntinst.startServer()
     else:
-        print("Setting up NetworkTables client for team {}".format(team))
-        ntinst.startClient4("wpilibpi")
-        print("DEBUG overriding networktables server")
-#        ntinst.setServer("192.168.200.106", NetworkTableInstance.kDefaultPort4)
-        ntinst.setServerTeam(team)
-        ntinst.startDSClient()
+        nt_connect()
 
     # start cameras
     for config in cameraConfigs:
@@ -304,10 +319,9 @@ if __name__ == "__main__":
     # loop forever
     while True:
         # reconnect network tables
-        if False and not ntinst.isConnected():
-            print("Network tables disconnected, tring to reconnect")
-            ntinst.stopClient()
-            ntinst.startClient4("wpilibpi")
+        if not ntinst.isConnected():
+            print("Network tables disconnected, trying to reconnect")
+            nt_connect()
             if not stormvision.is_alive() and ntinst.isConnected():
                 stormvision.restart()
 
