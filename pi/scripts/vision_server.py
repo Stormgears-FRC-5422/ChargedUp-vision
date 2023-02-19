@@ -289,6 +289,7 @@ def cv_thread(ntinst, camera, stream_out):
         id_dict = detector.get_information(frame)
         tag_list = []
         for ID in id_dict.keys():
+            tag_data = {}
             tag_data['id'] = int(ID)
             tag_data['distance'] = id_dict[ID][0]
             tag_data['roll'] = id_dict[ID][1]
