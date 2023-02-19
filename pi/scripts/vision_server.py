@@ -249,8 +249,6 @@ def cv_thread(ntinst, camera, stream_out):
     frame = np.zeros(shape=(640, 420, 3), dtype=np.uint8)
     detector = MarkerDetection()
 
-    tag_data = {}
-
     ntu = storm_core.nt_util(nt_inst=ntinst,base_table="vision-data")
 
     tag_data_struct = collections.OrderedDict()
@@ -296,7 +294,7 @@ def cv_thread(ntinst, camera, stream_out):
             tag_data['yaw'] = id_dict[ID][2]
             tag_data['pitch'] = id_dict[ID][3]
             tag_data['leftright'] = (58.74/width) * (id_dict[ID][4] - (width/2))
-            tag_data['updown'] = (35.2/height) * (id_dict[ID][5] - (height/2))
+            tag_data['updown'] = (35.2/height) * ((height/2) - id_dict[ID][5])
 
             print("ID: {}, Distance: {}, Roll: {}, Yaw: {}, Pitch: {} X: {:.1f}, Y:{:.1f}".format(ID, tag_data['distance'],tag_data['roll'],tag_data['yaw'],tag_data['pitch'],tag_data['leftright'],tag_data['updown']))
 
