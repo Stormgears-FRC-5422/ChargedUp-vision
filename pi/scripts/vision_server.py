@@ -259,23 +259,45 @@ def cv_thread(ntinst, camera, stream_out):
     tag_data_struct['roll'] = ntu.encode_encoding_field(num_bytes=2,precision=1,signed=True)
     tag_data_struct['yaw'] = ntu.encode_encoding_field(num_bytes=2,precision=1,signed=True)
     tag_data_struct['pitch'] = ntu.encode_encoding_field(num_bytes=2,precision=1,signed=True)
+    tag_data_struct['leftright'] = ntu.encode_encoding_field(num_bytes=2,precision=1,signed=True)
+    tag_data_struct['updown'] = ntu.encode_encoding_field(num_bytes=2,precision=1,signed=True)
 
 
     ntu.publish_data_structure(type="tag_data",structure_definition=tag_data_struct)
+    # 68.5 diagonal
+    # 
+    # 1200x800
+    # 
+    # sqrt(1200^2 + 800^2) = 1442.22
+    # Horiz = 68.5*1200/1442.22 = 57
+    # Vert  = 68.5*800/1442.22 = 38.5
+    # 
+    # sqrt(1200^2 + 720^2) = 1399.43
+    # Horiz = 68.5*1200/1399.43 = 58.74
+    # Vert  = 68.5*720/1399.43 = 35.2
+
+    width = None
+    height = None
 
     while True:
         _, frame = camera.grabFrame(frame)
 
+        if not width or width != frame.shape[1]:
+            height = frame.shape[0]
+            width = frame.shape[1]
+
         id_dict = detector.get_information(frame)
         tag_list = []
         for ID in id_dict.keys():
-            print("ID: {}, Distance: {}, Roll: {}, Yaw: {}, Pitch: {}".format(ID, id_dict[ID][0], id_dict[ID][1],
-                                                                              id_dict[ID][2], id_dict[ID][3]))
             tag_data['id'] = int(ID)
             tag_data['distance'] = id_dict[ID][0]
             tag_data['roll'] = id_dict[ID][1]
             tag_data['yaw'] = id_dict[ID][2]
             tag_data['pitch'] = id_dict[ID][3]
+            tag_data['leftright'] = (58.74/width) * (id_dict[ID][4] - (width/2))
+            tag_data['updown'] = (35.2/height) * (id_dict[ID][5] - (height/2))
+
+            print("ID: {}, Distance: {}, Roll: {}, Yaw: {}, Pitch: {} X: {:.1f}, Y:{:.1f}".format(ID, tag_data['distance'],tag_data['roll'],tag_data['yaw'],tag_data['pitch'],tag_data['leftright'],tag_data['updown']))
 
             tag_list.append(tag_data)
 

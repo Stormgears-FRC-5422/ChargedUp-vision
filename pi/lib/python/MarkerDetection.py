@@ -53,8 +53,7 @@ class MarkerDetection:
                 self.pointC = (int(self.pointC[0]), int(self.pointC[1]))
                 self.pointD = (int(self.pointD[0]), int(self.pointD[1]))
 
-                self.centerX, self.centerY = (self.pointA[0] + self.pointC[0]) // 2, (
-                        self.pointA[1] + self.pointC[1]) // 2
+                self.centerX, self.centerY = (self.pointA[0] + self.pointC[0]) // 2, (self.pointA[1] + self.pointC[1]) // 2
 
                 self.side1 = self.__calculate_distance_between_two_points(self.pointA, self.pointB)
                 self.side2 = self.__calculate_distance_between_two_points(self.pointB, self.pointC)
@@ -94,7 +93,7 @@ class MarkerDetection:
                 self.yaw = np.round(math.degrees(self.yaw), 3)
                 self.pitch = np.round(math.degrees(self.pitch), 3)
 
-                self.information[self.ids[marker][0]] = [self.distance, self.roll, self.yaw, self.pitch]
+                self.information[self.ids[marker][0]] = [self.distance, self.roll, self.yaw, self.pitch, self.centerX, self.centerY]
 
     def get_information(self, frame):
         self.information.clear()
