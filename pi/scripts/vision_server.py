@@ -10,9 +10,10 @@ import sys
 import collections
 import numpy as np
 import os
+import cv2
 
 
-from cscore import CameraServer, VideoSource, UsbCamera, MjpegServer
+from cscore import CameraServer, VideoSource, UsbCamera, MjpegServer, CvSink, CvSource, VideoSink, VideoMode
 from ntcore import NetworkTableInstance, EventFlags
 
 # Make sure our python libraries are in the path
@@ -277,6 +278,8 @@ def cv_thread(ntinst, camera, stream_out):
     width = None
     height = None
 
+    frame_count = 0
+
     while True:
         _, frame = camera.grabFrame(frame)
 
@@ -296,13 +299,16 @@ def cv_thread(ntinst, camera, stream_out):
             tag_data['leftright'] = (58.74/width) * (id_dict[ID][4] - (width/2))
             tag_data['updown'] = (35.2/height) * ((height/2) - id_dict[ID][5])
 
-            print("ID: {}, Distance: {}, Roll: {}, Yaw: {}, Pitch: {} X: {:.1f}, Y:{:.1f}".format(ID, tag_data['distance'],tag_data['roll'],tag_data['yaw'],tag_data['pitch'],tag_data['leftright'],tag_data['updown']))
+            if frame_count % 20 == 0:
+                print("ID: {}, Distance: {}, Roll: {}, Yaw: {}, Pitch: {} X: {:.1f}, Y:{:.1f}".format(ID, tag_data['distance'],tag_data['roll'],tag_data['yaw'],tag_data['pitch'],tag_data['leftright'],tag_data['updown']))
 
             tag_list.append(tag_data)
 
+        frame_count += 1
+
         ntu.publish_data("april_tag","tag_data",tag_list)
         #ntu = storm_core.nt_util(nt_inst=ntinst, base_table="vision_data")
-        output_frame = np.copy(frame)
+        output_frame = cv2.resize(np.copy(frame), (320, 240))
         stream_out.putFrame(output_frame)
 
 
@@ -324,7 +330,8 @@ if __name__ == "__main__":
 
     # start cameras
     for config in cameraConfigs:
-        cameras.append(startCamera(config))
+        cam = startCamera(config)
+        cameras.append(cam)
 
     # start switched cameras
     for config in switchedCameraConfigs:
@@ -332,7 +339,11 @@ if __name__ == "__main__":
 
     ## start stormgears code
     c_sink = CameraServer.getVideo(name="LifeCamVision")
-    c_source = CameraServer.putVideo(name="Target",width=320,height=240)
+    #c_source = CameraServer.putVideo(name="Target",width=320,height=240)
+    c_source = CvSource("DriverCam",VideoMode(VideoMode.PixelFormat.kMJPEG, 320,240,15))
+    mjpegServer = MjpegServer("Drive Cam", 1182)
+    mjpegServer.setSource(c_source)
+
     stormvision = storm_vision.vision_thread_mgr(cv_thread,(ntinst,c_sink,c_source))
     stormvision.start()
     ## end stormgears code
