@@ -1,6 +1,6 @@
 import cv2
 
-from MarkerDetection import MarkerDetection
+from pi.lib.python.MarkerDetection import MarkerDetection
 
 stream = cv2.VideoCapture(0)
 stream.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
