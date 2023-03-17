@@ -21,7 +21,7 @@ sys.path.insert(0,"/home/pi/lib/python")
 import storm_core
 import storm_vision
 from MarkerDetection import MarkerDetection
-
+from DetectFieldElementRetro import DetectFieldElementRetro
 
 
 #   JSON format:
@@ -246,7 +246,7 @@ def process_april_tag(frame,frame_count,detector):
     height = frame.shape[0]
     width = frame.shape[1]
 
-    id_dict = detector.get_information(frame)
+    output_frame, id_dict, speed = detector.get_information(frame)
     tag_list = []
     for ID in id_dict.keys():
         tag_data = {}
@@ -257,19 +257,29 @@ def process_april_tag(frame,frame_count,detector):
         tag_data['pitch'] = id_dict[ID][3]
         tag_data['leftright'] = (58.74/width) * (id_dict[ID][4] - (width/2))
         tag_data['updown'] = (35.2/height) * ((height/2) - id_dict[ID][5])
+        tag_data['speed'] = speed
 
         if frame_count % 20 == 0:
             print("ID: {}, Distance: {}, Roll: {}, Yaw: {}, Pitch: {} X: {:.1f}, Y:{:.1f}".format(ID, tag_data['distance'],tag_data['roll'],tag_data['yaw'],tag_data['pitch'],tag_data['leftright'],tag_data['updown']))
 
         tag_list.append(tag_data)
-    return tag_list
+    return output_frame, tag_list
 
 
 # FIXME - we should really move this function to its own module
-def process_objects(frame,frame_count):
+def process_objects(frame,frame_count,detector, mode):
+    element_dict = detector.detect_field_element(frame, mode)
+    element_list = []
+    if mode == "elements":
+        element_list.extend({"type": "cone", "offsetX": cone[0], "offsetY": cone[1]} for cone in element_dict['cones'])
+        element_list.extend({"type": "cube", "offsetX": cube[0], "offsetY": cube[1]} for cube in element_dict['cubes'])
+    elif mode == "retro":
+        element_list.extend({"type": "retro", "offsetX": retro[0], "offsetY": retro[1]} for retro in element_dict['retro'])
+    element_list.append({"type": "speed", "speed": element_dict['speed']})
     if frame_count % 20 == 0:
-        print("I can't process objects yet")
-    return None
+        print(f"Elements detected: {element_list}")
+
+    return frame, element_list
 
 
 # This is an example.  instead we should instance an instance of our CV processing code
@@ -278,9 +288,10 @@ def process_objects(frame,frame_count):
 def cv_thread(ntinst, camera, stream_out):
     print("Processing cv_thread")
     frame = np.zeros(shape=(640, 420, 3), dtype=np.uint8)
-    detector = MarkerDetection()
+    marker_detector = MarkerDetection()
+    element_detector = DetectFieldElementRetro()
 
-    detection_mode = 0   # 0 = AprilTag, 1 = Cube/Cone
+    detection_mode = 0   # 0 = AprilTag, 1 = Cube/Cone, 2 = retroreflective tape
 
     ntu = storm_core.nt_util(nt_inst=ntinst,base_table="vision-data")
 
@@ -292,9 +303,17 @@ def cv_thread(ntinst, camera, stream_out):
     tag_data_struct['pitch'] = ntu.encode_encoding_field(num_bytes=2,precision=1,signed=True)
     tag_data_struct['leftright'] = ntu.encode_encoding_field(num_bytes=2,precision=1,signed=True)
     tag_data_struct['updown'] = ntu.encode_encoding_field(num_bytes=2,precision=1,signed=True)
+    tag_data_struct['speed'] = ntu.encode_encoding_field(num_bytes=2,precision=1,signed=True)
 
 
     ntu.publish_data_structure(type="tag_data",structure_definition=tag_data_struct)
+    
+    element_data_struct = collections.OrderedDict()
+    element_data_struct['type'] = ntu.encode_encoding_field(num_bytes=1,precision=0)
+    element_data_struct['offsetX'] = ntu.encode_encoding_field(num_bytes=2,precision=1,signed=True)
+    element_data_struct['offsetY'] = ntu.encode_encoding_field(num_bytes=2,precision=1,signed=True)
+    element_data_struct['speed'] = ntu.encode_encoding_field(num_bytes=2,precision=1,signed=True)
+    
     # 68.5 diagonal
     # 
     # 1200x800
@@ -321,15 +340,20 @@ def cv_thread(ntinst, camera, stream_out):
 
         _, frame = camera.grabFrame(frame)
         if detection_mode == 0:
-            tag_list = process_april_tag(frame,frame_count,detector)
+            output_frame, tag_list = process_april_tag(frame,frame_count,marker_detector)
             ntu.publish_data("april_tag","tag_data",tag_list)
-            output_frame = cv2.resize(np.copy(frame), (320, 240))
+            output_frame = cv2.resize(output_frame, (320, 240))
             stream_out.putFrame(output_frame)
         elif detection_mode == 1:
-            new_frame = process_objects(frame,frame_count)
-            output_frame = cv2.resize(np.copy(new_frame), (320, 240))
+            output_frame, element_list = process_objects(frame,frame_count,element_detector, "elements")
+            ntu.publish_data("field_elements", "elements_data", element_list)
+            output_frame = cv2.resize(output_frame, (320, 240))
             stream_out.putFrame(output_frame)
-
+        elif detection_mode == 2:
+            output_frame, element_list = process_objects(frame,frame_count,element_detector, "retro")
+            ntu.publish_data("field_elements", "elements_data", element_list)
+            output_frame = cv2.resize(output_frame, (320, 240))
+            stream_out.putFrame(output_frame)
         frame_count += 1
 
 

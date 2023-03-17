@@ -11,7 +11,7 @@ def nothing():
 stream = cv2.VideoCapture(2)
 stream.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
 stream.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-stream.set(cv2.CAP_PROP_BRIGHTNESS, 130)
+stream.set(cv2.CAP_PROP_BRIGHTNESS, 0)
 
 # Create a window
 cv2.namedWindow('Frame')

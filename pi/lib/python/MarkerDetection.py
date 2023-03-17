@@ -2,6 +2,7 @@ import math
 
 import cv2
 import numpy as np
+import time
 from scipy.spatial.transform import Rotation
 from transformations import euler_from_quaternion
 
@@ -35,6 +36,9 @@ class MarkerDetection:
         marker_info, ids, _ = self.detector.detectMarkers(frame)
         markers = []
         
+        frame_copy = frame.copy()
+        frame_copy = cv2.aruco.drawDetectedMarkers(frame_copy, marker_info)
+        
         if len(marker_info) > 0:
             for i,marker in enumerate(marker_info):
                 corners = marker[0]
@@ -48,9 +52,9 @@ class MarkerDetection:
                 id = ids[i][0]
 
                 markers.append([id,corners,[side1, side2, side3, side4]])
-        return markers
+        return frame_copy, markers
 
-    def __calculate_distance_angle(self,markers):
+    def __calculate_distance_angle(self,markers,frame_copy):
         info = {}
         if len(markers):
             for marker in markers:
@@ -59,6 +63,8 @@ class MarkerDetection:
                 center = [(corners[0][0] + corners[2][0]) // 2, (corners[0][1] + corners[2][1]) // 2]
 
                 rotational_vectors, translation_vectors, _ = cv2.aruco.estimatePoseSingleMarkers([corners], self.tag_size, self.intrinsic_parameters,self.distortion_coefficients)
+                frame_copy = cv2.drawFrameAxes(frame_copy, self.intrinsic_parameters, self.distortion_coefficients, rotational_vectors, translation_vectors, 0.1)
+                
                 distance = np.round(np.linalg.norm(translation_vectors), 3)
 
                 rotation_matrix = np.eye(4)
@@ -78,10 +84,12 @@ class MarkerDetection:
                 pitch = np.round(math.degrees(pitch), 3)
 
                 info[id] = [distance, roll, yaw, pitch, center[0], center[1]]
-        return info
+        return frame_copy, info
 
     def get_information(self, frame):
-        markers = self.__detect_tags(frame)
-        info = self.__calculate_distance_angle(markers)
-        return info
+        start = time.time()
+        frame_copy, markers = self.__detect_tags(frame)
+        frame_copy, info = self.__calculate_distance_angle(markers, frame_copy)
+        end = time.time()
+        return frame_copy, info, end - start
 
