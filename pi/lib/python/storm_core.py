@@ -203,7 +203,7 @@ class nt_util:
         return data_list
 
     def pull_binary_data(self,name,type):
-        table = self.nt_inst.getTable(sel.base_table)
+        table = self.nt_inst.getTable(self.base_table)
         data_sub = table.getRawTopic(f'binary_data/{type}').subscribe()
         raw_data = data_sub.get(bytearray())
         # Fixme, save subscribe in object?
