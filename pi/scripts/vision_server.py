@@ -241,6 +241,37 @@ def nt_connect():
     print(f"Connected to Network Tables {connections[0]}")
 
 
+# FIXME - we should really move this function to its own module
+def process_april_tag(frame,frame_count,detector):
+    height = frame.shape[0]
+    width = frame.shape[1]
+
+    id_dict = detector.get_information(frame)
+    tag_list = []
+    for ID in id_dict.keys():
+        tag_data = {}
+        tag_data['id'] = int(ID)
+        tag_data['distance'] = id_dict[ID][0]
+        tag_data['roll'] = id_dict[ID][1]
+        tag_data['yaw'] = id_dict[ID][2]
+        tag_data['pitch'] = id_dict[ID][3]
+        tag_data['leftright'] = (58.74/width) * (id_dict[ID][4] - (width/2))
+        tag_data['updown'] = (35.2/height) * ((height/2) - id_dict[ID][5])
+
+        if frame_count % 20 == 0:
+            print("ID: {}, Distance: {}, Roll: {}, Yaw: {}, Pitch: {} X: {:.1f}, Y:{:.1f}".format(ID, tag_data['distance'],tag_data['roll'],tag_data['yaw'],tag_data['pitch'],tag_data['leftright'],tag_data['updown']))
+
+        tag_list.append(tag_data)
+    return tag_list
+
+
+# FIXME - we should really move this function to its own module
+def process_objects(frame,frame_count):
+    if frame_count % 20 == 0:
+        print("I can't process objects yet")
+    return None
+
+
 # This is an example.  instead we should instance an instance of our CV processing code
 # with handles to ntinst, camera and stream out and execute the a processing method in 
 # the loop below
@@ -248,6 +279,8 @@ def cv_thread(ntinst, camera, stream_out):
     print("Processing cv_thread")
     frame = np.zeros(shape=(640, 420, 3), dtype=np.uint8)
     detector = MarkerDetection()
+
+    detection_mode = 0   # 0 = AprilTag, 1 = Cube/Cone
 
     ntu = storm_core.nt_util(nt_inst=ntinst,base_table="vision-data")
 
@@ -274,41 +307,30 @@ def cv_thread(ntinst, camera, stream_out):
     # Horiz = 68.5*1200/1399.43 = 58.74
     # Vert  = 68.5*720/1399.43 = 35.2
 
-    width = None
-    height = None
+    # setup mode subscriber
+    table = ntinst.getTable("vision_data")
+    mode_sub = table.getIntegerTopic("vision_mode").subscribe(-1)
 
     frame_count = 0
 
     while True:
+        next_detection_mode = mode_sub.get(0)
+        if next_detection_mode != detection_mode:
+            print(f"Changing vision mode to {next_detection_mode}")
+            detection_mode = next_detection_mode
+
         _, frame = camera.grabFrame(frame)
-
-        if not width or width != frame.shape[1]:
-            height = frame.shape[0]
-            width = frame.shape[1]
-
-        id_dict = detector.get_information(frame)
-        tag_list = []
-        for ID in id_dict.keys():
-            tag_data = {}
-            tag_data['id'] = int(ID)
-            tag_data['distance'] = id_dict[ID][0]
-            tag_data['roll'] = id_dict[ID][1]
-            tag_data['yaw'] = id_dict[ID][2]
-            tag_data['pitch'] = id_dict[ID][3]
-            tag_data['leftright'] = (58.74/width) * (id_dict[ID][4] - (width/2))
-            tag_data['updown'] = (35.2/height) * ((height/2) - id_dict[ID][5])
-
-            if frame_count % 20 == 0:
-                print("ID: {}, Distance: {}, Roll: {}, Yaw: {}, Pitch: {} X: {:.1f}, Y:{:.1f}".format(ID, tag_data['distance'],tag_data['roll'],tag_data['yaw'],tag_data['pitch'],tag_data['leftright'],tag_data['updown']))
-
-            tag_list.append(tag_data)
+        if detection_mode == 0:
+            tag_list = process_april_tag(frame,frame_count,detector)
+            ntu.publish_data("april_tag","tag_data",tag_list)
+            output_frame = cv2.resize(np.copy(frame), (320, 240))
+            stream_out.putFrame(output_frame)
+        elif detection_mode == 1:
+            new_frame = process_objects(frame,frame_count)
+            output_frame = cv2.resize(np.copy(new_frame), (320, 240))
+            stream_out.putFrame(output_frame)
 
         frame_count += 1
-
-        ntu.publish_data("april_tag","tag_data",tag_list)
-        #ntu = storm_core.nt_util(nt_inst=ntinst, base_table="vision_data")
-        output_frame = cv2.resize(np.copy(frame), (320, 240))
-        stream_out.putFrame(output_frame)
 
 
 if __name__ == "__main__":
