@@ -5,7 +5,7 @@ import glob
 import time
 
 # Constants
-area_threshold = 500
+area_threshold = 3000
 # lower_yellow = np.array([22, 93, 0])
 # upper_yellow = np.array([45, 255, 255])
 # lower_yellow = np.array([10, 35, 100])
