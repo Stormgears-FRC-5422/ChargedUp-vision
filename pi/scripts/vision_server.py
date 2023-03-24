@@ -11,6 +11,7 @@ import collections
 import numpy as np
 import os
 import cv2
+import time
 
 
 from cscore import CameraServer, VideoSource, UsbCamera, MjpegServer, CvSink, CvSource, VideoSink, VideoMode
@@ -258,9 +259,6 @@ def process_april_tag(frame,frame_count,detector):
         tag_data['leftright'] = (58.74/width) * (id_dict[ID][4] - (width/2))
         tag_data['updown'] = (35.2/height) * ((height/2) - id_dict[ID][5])
 
-        if frame_count % 20 == 0:
-            print("ID: {}, Distance: {}, Roll: {}, Yaw: {}, Pitch: {} X: {:.1f}, Y:{:.1f}".format(ID, tag_data['distance'],tag_data['roll'],tag_data['yaw'],tag_data['pitch'],tag_data['leftright'],tag_data['updown']))
-
         tag_list.append(tag_data)
     return tag_list
 
@@ -292,6 +290,7 @@ def cv_thread(ntinst, camera, stream_out):
     tag_data_struct['pitch'] = ntu.encode_encoding_field(num_bytes=2,precision=1,signed=True)
     tag_data_struct['leftright'] = ntu.encode_encoding_field(num_bytes=2,precision=1,signed=True)
     tag_data_struct['updown'] = ntu.encode_encoding_field(num_bytes=2,precision=1,signed=True)
+    tag_data_struct['process_time'] = ntu.encode_encoding_field(num_bytes=2,precision=0,signed=True)
 
 
     ntu.publish_data_structure(type="tag_data",structure_definition=tag_data_struct)
@@ -314,6 +313,8 @@ def cv_thread(ntinst, camera, stream_out):
     frame_count = 0
 
     while True:
+        start = time.perf_counter()
+
         next_detection_mode = mode_sub.get(0)
         if next_detection_mode != detection_mode:
             print(f"Changing vision mode to {next_detection_mode}")
@@ -322,6 +323,15 @@ def cv_thread(ntinst, camera, stream_out):
         _, frame = camera.grabFrame(frame)
         if detection_mode == 0:
             tag_list = process_april_tag(frame,frame_count,detector)
+            end = time.perf_counter()
+            delta_ms = (start - end) * 1000;
+            for tag in tag_list:
+                tag['process_time'] = delta_ms
+                if frame_count % 20 == 0:
+                    print("ID: {}, Process_time: {}, Distance: {}, Roll: {}, Yaw: {}, Pitch: {} X: {:.1f}, Y:{:.1f}".format(tag['id'], tag['distance'],tag['process_time'],tag['roll'],tag['yaw'],tag['pitch'],tag['leftright'],tag['updown']))
+
+
+
             ntu.publish_data("april_tag","tag_data",tag_list)
             output_frame = cv2.resize(np.copy(frame), (320, 240))
             stream_out.putFrame(output_frame)
@@ -360,10 +370,10 @@ if __name__ == "__main__":
 
     ## start stormgears code
     c_sink = CameraServer.getVideo(name="LifeCamVision")
-    #c_source = CameraServer.putVideo(name="Target",width=320,height=240)
-    c_source = CvSource("DriverCam",VideoMode(VideoMode.PixelFormat.kMJPEG, 320,240,15))
-    mjpegServer = MjpegServer("Drive Cam", 1182)
-    mjpegServer.setSource(c_source)
+    c_source = CameraServer.putVideo(name="DriverCam",width=320,height=240)
+#    c_source = CvSource("DriverCam",VideoMode(VideoMode.PixelFormat.kMJPEG, 320,240,15))
+#    mjpegServer = CameraServer.addSserver("Drive Cam")
+#    mjpegServer.setSource(c_source)
 
     stormvision = storm_vision.vision_thread_mgr(cv_thread,(ntinst,c_sink,c_source))
     stormvision.start()
