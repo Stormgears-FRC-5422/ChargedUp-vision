@@ -2,7 +2,7 @@ from time import sleep
 import sys
 sys.path.insert(0,"/home/pi/lib/python")
 import numpy as np
-from ntcore import NetworkTableInstance
+from ntcore import NetworkTableInstance,PubSubOptions
 import collections
 
 
@@ -229,7 +229,7 @@ class nt_util:
 
             # Table: BASE/binary/datatype
             table = self.nt_inst.getTable(self.base_table)
-            data_pub = table.getRawTopic(f"binary_data/{type}/{name}").publish(type)
+            data_pub = table.getRawTopic(f"binary_data/{type}/{name}").publish(type,PubSubOptions(sendAll=True))
             self.publishers[type]['data'][name] = data_pub
         else:
             data_pub = self.publishers[type]['data'][name]

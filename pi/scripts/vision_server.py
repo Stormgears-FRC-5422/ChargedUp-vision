@@ -290,7 +290,8 @@ def cv_thread(ntinst, camera, stream_out):
     tag_data_struct['pitch'] = ntu.encode_encoding_field(num_bytes=2,precision=1,signed=True)
     tag_data_struct['leftright'] = ntu.encode_encoding_field(num_bytes=2,precision=1,signed=True)
     tag_data_struct['updown'] = ntu.encode_encoding_field(num_bytes=2,precision=1,signed=True)
-    tag_data_struct['process_time'] = ntu.encode_encoding_field(num_bytes=2,precision=0,signed=True)
+    tag_data_struct['process_time'] = ntu.encode_encoding_field(num_bytes=2,precision=0,signed=False)
+    tag_data_struct['frame_id'] = ntu.encode_encoding_field(num_bytes=2,precision=0,signed=False)
 
 
     ntu.publish_data_structure(type="tag_data",structure_definition=tag_data_struct)
@@ -327,8 +328,9 @@ def cv_thread(ntinst, camera, stream_out):
             delta_ms = (start - end) * 1000;
             for tag in tag_list:
                 tag['process_time'] = delta_ms
+                tag['frame_id'] = frame_count
                 if frame_count % 20 == 0:
-                    print("ID: {}, Process_time: {}, Distance: {}, Roll: {}, Yaw: {}, Pitch: {} X: {:.1f}, Y:{:.1f}".format(tag['id'], tag['distance'],tag['process_time'],tag['roll'],tag['yaw'],tag['pitch'],tag['leftright'],tag['updown']))
+                    print("ID: {}, frame: {} , Process_time: {}, Distance: {}, Roll: {}, Yaw: {}, Pitch: {} X: {:.1f}, Y:{:.1f}".format(tag['id'], tag['frame_id'],tag['distance'],tag['process_time'],tag['roll'],tag['yaw'],tag['pitch'],tag['leftright'],tag['updown']))
 
 
 
